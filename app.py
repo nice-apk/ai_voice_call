@@ -1,48 +1,47 @@
-from flask import Flask, request, Response
+from flask import Flask, request
 from twilio.twiml.voice_response import VoiceResponse
-import openai, os
+from openai import OpenAI
+import os
 
 app = Flask(__name__)
 
-# --- Load OpenAI Key ---
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-@app.route("/")
-def home():
-    return "✅ AI Voice Assistant Ready!"
+# Initialize OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 @app.route("/voice", methods=["POST"])
 def voice():
-    # Get the caller’s speech (if any)
-    caller_number = request.form.get("From", "")
-    recording_url = request.form.get("RecordingUrl", "")
-    user_input = request.form.get("SpeechResult", "")
+    user_input = request.values.get("SpeechResult", "").strip()
+    print(f"User said: {user_input}")
 
-    print(f"📞 Call from: {caller_number}")
-    print(f"💬 User said: {user_input}")
+    # Detect language (basic logic)
+    if any(word in user_input.lower() for word in ["hai", "mujhe", "bukhar", "dard", "nahi", "kya"]):
+        language = "hindi"
+    else:
+        language = "english"
 
-    # Generate AI reply using OpenAI
-    prompt = f"The user said: {user_input}. Reply naturally like an assistant that can understand any language."
+    # Multilingual prompt
+    if language == "hindi":
+        prompt = f"Respond in Hindi in one short sentence: {user_input}"
+    else:
+        prompt = f"Respond in English in one short sentence: {user_input}"
 
-    ai_reply = "Hello, how can I help you?"  # default fallback
-    try:
-        completion = openai.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
-        )
-        ai_reply = completion.choices[0].message["content"]
-    except Exception as e:
-        print(f"❌ OpenAI error: {e}")
+    # Generate AI response
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": "You are a friendly AI medical assistant."},
+            {"role": "user", "content": prompt}
+        ]
+    )
 
-    # Twilio Voice response
-    resp = VoiceResponse()
-    resp.say(ai_reply, voice="Polly.Amy", language="en-US")  # Polly.Amy is natural female voice
+    ai_reply = completion.choices[0].message.content
+    print("AI Reply:", ai_reply)
 
-    # Optionally record call
-    resp.record(maxLength="30", playBeep=True)
+    # Twilio voice response
+    response = VoiceResponse()
+    response.say(ai_reply, language="hi-IN" if language == "hindi" else "en-US")
 
-    return Response(str(resp), mimetype="text/xml")
+    return str(response)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=10000)
