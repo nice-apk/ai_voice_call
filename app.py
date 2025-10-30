@@ -1,27 +1,17 @@
-from flask import Flask, request, Response
-from twilio.twiml.voice_response import VoiceResponse, Connect
+from flask import Flask, request
 import os
 
 app = Flask(__name__)
 
-@app.route("/voice", methods=["POST"])
-def voice():
-    """Twilio will call this endpoint when someone calls your Twilio number."""
-    resp = VoiceResponse()
-
-    # Connect to OpenAI Realtime API (AI voice)
-    connect = Connect()
-    connect.stream(
-        url="wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
-    )
-    resp.append(connect)
-    return Response(str(resp), mimetype="text/xml")
-
 @app.route("/")
-def index():
+def home():
     return "AI Voice Assistant Ready!"
+
+# Optional test route to verify it's working
+@app.route("/test")
+def test():
+    return {"status": "ok"}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-
